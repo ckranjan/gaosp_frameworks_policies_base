@@ -511,7 +511,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         PowerManager pm = (PowerManager)context.getSystemService(Context.POWER_SERVICE);
         mBroadcastWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
                 "PhoneWindowManager.mBroadcastWakeLock");
-        mDockWakeLock = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK,
+        mDockWakeLock = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK | PowerManager.ON_AFTER_RELEASE,
                 "PhoneWindowManager.mDockWakeLock");
         mDockWakeLock.setReferenceCounted(false);
         mEnableShiftMenuBugReports = "1".equals(SystemProperties.get("ro.debuggable"));
@@ -1450,18 +1450,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 }
             } else if (mHideLockScreen) {
                 if (mKeyguard.hideLw(false)) {
-                    mKeyguardMediator.setHidden(true);
                     changes |= FINISH_LAYOUT_REDO_LAYOUT
                             | FINISH_LAYOUT_REDO_CONFIG
                             | FINISH_LAYOUT_REDO_WALLPAPER;
                 }
+                mKeyguardMediator.setHidden(true);
             } else {
                 if (mKeyguard.showLw(false)) {
-                    mKeyguardMediator.setHidden(false);
                     changes |= FINISH_LAYOUT_REDO_LAYOUT
                             | FINISH_LAYOUT_REDO_CONFIG
                             | FINISH_LAYOUT_REDO_WALLPAPER;
                 }
+                mKeyguardMediator.setHidden(false);
             }
         }
         

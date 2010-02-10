@@ -179,6 +179,10 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
         }
 
         mCarrier = (TextView) findViewById(R.id.carrier);
+        // Required for Marquee to work
+        mCarrier.setSelected(true);
+        mCarrier.setTextColor(0xffffffff);
+
         mDate = (TextView) findViewById(R.id.date);
         mStatus1 = (TextView) findViewById(R.id.status1);
         mStatus2 = (TextView) findViewById(R.id.status2);
@@ -470,8 +474,12 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
                 mEmergencyCallButton.setVisibility(View.GONE);
                 break;
             case NetworkLocked:
-                //  text
-                mCarrier.setText(R.string.lockscreen_network_locked_message);
+                // The carrier string shows both sim card status (i.e. No Sim Card) and
+                // carrier's name and/or "Emergency Calls Only" status
+                mCarrier.setText(
+                        getCarrierString(
+                                mUpdateMonitor.getTelephonyPlmn(),
+                                getContext().getText(R.string.lockscreen_network_locked_message)));
                 mScreenLocked.setText(R.string.lockscreen_instructions_when_pattern_disabled);
 
                 // layout
@@ -481,7 +489,10 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
                 break;
             case SimMissing:
                 // text
-                mCarrier.setText(R.string.lockscreen_missing_sim_message_short);
+                mCarrier.setText(
+                        getCarrierString(
+                                mUpdateMonitor.getTelephonyPlmn(),
+                                getContext().getText(R.string.lockscreen_missing_sim_message_short)));
                 mScreenLocked.setText(R.string.lockscreen_instructions_when_pattern_disabled);
 
                 // layout
@@ -492,7 +503,10 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
                 break;
             case SimMissingLocked:
                 // text
-                mCarrier.setText(R.string.lockscreen_missing_sim_message_short);
+                mCarrier.setText(
+                        getCarrierString(
+                                mUpdateMonitor.getTelephonyPlmn(),
+                                getContext().getText(R.string.lockscreen_missing_sim_message_short)));
                 mScreenLocked.setText(R.string.lockscreen_missing_sim_instructions);
 
                 // layout
@@ -503,7 +517,10 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
                 break;
             case SimLocked:
                 // text
-                mCarrier.setText(R.string.lockscreen_sim_locked_message);
+                mCarrier.setText(
+                        getCarrierString(
+                                mUpdateMonitor.getTelephonyPlmn(),
+                                getContext().getText(R.string.lockscreen_sim_locked_message)));
 
                 // layout
                 mScreenLocked.setVisibility(View.INVISIBLE);
@@ -512,7 +529,10 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
                 break;
             case SimPukLocked:
                 // text
-                mCarrier.setText(R.string.lockscreen_sim_puk_locked_message);
+                mCarrier.setText(
+                        getCarrierString(
+                                mUpdateMonitor.getTelephonyPlmn(),
+                                getContext().getText(R.string.lockscreen_sim_puk_locked_message)));
                 mScreenLocked.setText(R.string.lockscreen_sim_puk_locked_instructions);
 
                 // layout
@@ -528,7 +548,7 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
         if (telephonyPlmn != null && telephonySpn == null) {
             return telephonyPlmn;
         } else if (telephonyPlmn != null && telephonySpn != null) {
-            return telephonyPlmn + "\n" + telephonySpn;
+            return telephonyPlmn + "|" + telephonySpn;
         } else if (telephonyPlmn == null && telephonySpn != null) {
             return telephonySpn;
         } else {
