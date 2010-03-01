@@ -197,6 +197,24 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
                     }
                 };
 
+	// Drakaz : add reboot recovery in shutdown menu
+	SinglePressAction mRebootRecoveryModeAction = new SinglePressAction(
+                        com.android.internal.R.drawable.ic_menu_refresh,
+                        R.string.global_action_reboot_recovery) {
+
+                    public void onPress() {
+                        ShutdownThread.RebootRecovery(mContext, true,true);
+                    }
+
+                    public boolean showDuringKeyguard() {
+                        return true;
+                    }
+
+                    public boolean showBeforeProvisioning() {
+                        return true;
+                    }
+                };
+
         mItems = Lists.newArrayList(
                 // silent mode
                 mSilentModeToggle,
@@ -204,6 +222,8 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
                 mAirplaneModeOn,
                 // Reboot
                 mRebootModeAction,
+		// Reboot Recovery
+		mRebootRecoveryModeAction,
                 // last: power off
                 new SinglePressAction(
                         com.android.internal.R.drawable.ic_lock_power_off,
