@@ -46,6 +46,7 @@ import android.provider.Settings;
 
 import com.android.internal.policy.PolicyManager;
 import com.android.internal.telephony.ITelephony;
+
 import android.util.Config;
 import android.util.EventLog;
 import android.util.Log;
@@ -210,6 +211,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     int mAccelerometerDefault = DEFAULT_ACCELEROMETER_ROTATION;
     boolean mHasSoftInput = false;
     
+    Long mTrackballHitTime;
+    static final long NEXT_DURATION = 400;
+    
     // The current size of the screen.
     int mW, mH;
     // During layout, the current screen borders with all outer decoration
@@ -247,6 +251,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     static final int ENDCALL_SLEEPS = 0x2;
     static final int DEFAULT_ENDCALL_BEHAVIOR = ENDCALL_SLEEPS;
     int mEndcallBehavior;
+    boolean mTrackballWakeScreen;
     
     int mLandscapeRotation = -1;
     int mPortraitRotation = -1;
@@ -270,6 +275,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             ContentResolver resolver = mContext.getContentResolver();
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.END_BUTTON_BEHAVIOR), false, this);
+            resolver.registerContentObserver(Settings.System.getUriFor(
+                    Settings.System.TRACKBALL_WAKE_SCREEN), false, this);
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.ACCELEROMETER_ROTATION), false, this);
             resolver.registerContentObserver(Settings.Secure.getUriFor(
@@ -295,6 +302,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             synchronized (mLock) {
                 mEndcallBehavior = Settings.System.getInt(resolver,
                         Settings.System.END_BUTTON_BEHAVIOR, DEFAULT_ENDCALL_BEHAVIOR);
+                mTrackballWakeScreen = (Settings.System.getInt(mContext.getContentResolver(),
+                        Settings.System.TRACKBALL_WAKE_SCREEN, 0) == 1);
                 mFancyRotationAnimation = Settings.System.getInt(resolver,
                         "fancy_rotation_anim", 0) != 0 ? 0x80 : 0;
                 int accelerometerDefault = Settings.System.getInt(resolver,
@@ -1625,7 +1634,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     /** {@inheritDoc} */
     public int interceptKeyTq(RawInputEvent event, boolean screenIsOn) {
         int result = ACTION_PASS_TO_USER;
-        final boolean isWakeKey = isWakeKeyTq(event);
+        boolean isWakeKey = isWakeKeyTq(event);
         // If screen is off then we treat the case where the keyguard is open but hidden
         // the same as if it were open and in front.
         // This will prevent any keys other than the power button from waking the screen
@@ -1636,7 +1645,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         if (false) {
             Log.d(TAG, "interceptKeyTq event=" + event + " keycode=" + event.keycode
-                  + " screenIsOn=" + screenIsOn + " keyguardActive=" + keyguardActive);
+                  + " screenIsOn=" + screenIsOn + " keyguardActive=" + keyguardActive + " isWakeKey=" + isWakeKey);
         }
 
         if (keyguardActive) {
@@ -1649,6 +1658,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
                 final boolean isKeyDown =
                         (event.type == RawInputEvent.EV_KEY) && (event.value != 0);
+                
+                // Detect if trackball pressed
+                boolean trackballDown = (event.type == RawInputEvent.EV_KEY && event.value != 0 
+                        && event.scancode == RawInputEvent.BTN_MOUSE);
+                
                 if (isWakeKey && isKeyDown) {
 
                     // tell the mediator about a wake key, it may decide to
@@ -1664,6 +1678,32 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         } else if (isMusicActive()) {
                             handleVolumeKey(AudioManager.STREAM_MUSIC, event.keycode);
                         }
+                    }
+                }
+                else if (trackballDown && isMusicActive()) {
+                    long time = SystemClock.elapsedRealtime();
+                    if (mTrackballHitTime == null)
+                        mTrackballHitTime = time;
+                    else {
+                        long timeBetweenHits;
+                        if (time > mTrackballHitTime)
+                            timeBetweenHits = time - mTrackballHitTime;
+                        // System clock rolled over
+                        else
+                            timeBetweenHits = time + (Long.MAX_VALUE - mTrackballHitTime);
+                        
+                        // Skip to the next song
+                        if (timeBetweenHits < NEXT_DURATION) {
+                            // Shamelessly copied from MediaPlaybackService.java, which
+                            // should be public, but isn't.
+                            Intent i = new Intent("com.android.music.musicservicecommand");
+                            i.putExtra("command", "next");
+                            i.putExtra("trackball", true);
+
+                            mContext.sendBroadcast(i);
+                        }
+                        
+                        mTrackballHitTime = null;
                     }
                 }
             }
@@ -1905,8 +1945,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         // There are not key maps for trackball devices, but we'd still
         // like to have pressing it wake the device up, so force it here.
         int keycode = event.keycode;
+        int scancode = event.scancode;
         int flags = event.flags;
-        if (keycode == RawInputEvent.BTN_MOUSE) {
+        if (mTrackballWakeScreen && 
+                (keycode == RawInputEvent.BTN_MOUSE || scancode == RawInputEvent.BTN_MOUSE)) {
             flags |= WindowManagerPolicy.FLAG_WAKE;
         }
         return (flags
