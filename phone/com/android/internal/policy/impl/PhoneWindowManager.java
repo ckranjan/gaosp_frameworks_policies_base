@@ -525,23 +525,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         };
     };
 
-   /**
-    * When volumedown and volumeup keys are pressed play/pause is enabled
-    */
-   Runnable mVolumeUpDownLongPress = new Runnable () {
-	public void run() {
-	     /*
-	      * Eat the longpress so it won't dismiss the recent apps dialog when
-	      * the user lets go of the volume key
-	      */
-	    if(mVolumeUpPressed == true && mVolumeDownPressed != false)
-	    Intent i = new Intent("com.android.music.musicservicecommand");
-	    i.putExtra("command", "togglepause");
-	  
-	  mContext.sendBroadcast(i);
-	};    
-     };
-
     /**
      * Create (if necessary) and launch the recent apps dialog
      */
