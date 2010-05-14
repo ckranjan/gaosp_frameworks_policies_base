@@ -139,11 +139,34 @@ public class RecentApplicationsDialog extends Dialog implements OnClickListener 
     }
     
     private void loadNineRecentAppsConfig() {
-        loadSixRecentAppsConfig(); //TODO: :)
+        setContentView(com.android.internal.R.layout.recent_apps_dialog_9);
+    
+        mButtons[0] = findViewById(com.android.internal.R.id.button1);
+        mButtons[1] = findViewById(com.android.internal.R.id.button2);
+        mButtons[2] = findViewById(com.android.internal.R.id.button3);
+        mButtons[3] = findViewById(com.android.internal.R.id.button4);
+        mButtons[4] = findViewById(com.android.internal.R.id.button5);
+        mButtons[5] = findViewById(com.android.internal.R.id.button6);
+        mButtons[6] = findViewById(com.android.internal.R.id.button7);
+        mButtons[7] = findViewById(com.android.internal.R.id.button8);
+        mButtons[8] = findViewById(com.android.internal.R.id.button9);
     }
     
     private void loadTwelveRecentAppsConfig() {
-        loadFifteenRecentAppsConfig(); //TODO: :)
+        setContentView(com.android.internal.R.layout.recent_apps_dialog_12);
+    
+        mButtons[0] = findViewById(com.android.internal.R.id.button1);
+        mButtons[1] = findViewById(com.android.internal.R.id.button2);
+        mButtons[2] = findViewById(com.android.internal.R.id.button3);
+        mButtons[3] = findViewById(com.android.internal.R.id.button4);
+        mButtons[4] = findViewById(com.android.internal.R.id.button5);
+        mButtons[5] = findViewById(com.android.internal.R.id.button6);
+        mButtons[6] = findViewById(com.android.internal.R.id.button7);
+        mButtons[7] = findViewById(com.android.internal.R.id.button8);
+        mButtons[8] = findViewById(com.android.internal.R.id.button9);
+        mButtons[9] = findViewById(com.android.internal.R.id.button10);
+        mButtons[10] = findViewById(com.android.internal.R.id.button11);
+        mButtons[11] = findViewById(com.android.internal.R.id.button12);
     }
     
     private void loadFifteenRecentAppsConfig() {
