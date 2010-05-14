@@ -88,6 +88,7 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
     private TextView mStatus1;
     private TextView mStatusSep;
     private TextView mStatus2;
+    private TextView mCustomMsg;
 
 
     private LockPattern mLockPattern;
@@ -185,6 +186,15 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
         mStatus1 = (TextView) findViewById(R.id.status1);
         mStatusSep = (TextView) findViewById(R.id.statusSep);
         mStatus2 = (TextView) findViewById(R.id.status2);
+        mCustomMsg = (TextView) findViewById(R.id.customMsg);
+        
+        if (mLockPatternUtils.isShowCustomMsg()) {
+            mCustomMsg.setVisibility(View.VISIBLE);
+            mCustomMsg.setText(mLockPatternUtils.getCustomMsg());
+        }
+        else {
+            mCustomMsg.setVisibility(View.GONE);
+        }
 
         resetStatusInfo();
 
@@ -229,6 +239,12 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
 
         // vibrate mode will be the same for the life of this screen
         mLockPattern.setTactileFeedbackEnabled(mLockPatternUtils.isTactileFeedbackEnabled());
+        
+        // visible dots mode will be the same for the life of this screen
+        mLockPattern.setVisibleDots(mLockPatternUtils.isVisibleDotsEnabled());
+        
+        // visible error path will be the same for the life of this screen
+        mLockPattern.setShowErrorPath(mLockPatternUtils.isShowErrorPath());
 
         // assume normal footer mode for now
         updateFooter(FooterMode.Normal);
