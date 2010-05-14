@@ -61,8 +61,6 @@ public class RecentApplicationsDialog extends Dialog implements OnClickListener 
 
     public RecentApplicationsDialog(Context context) {
         super(context, com.android.internal.R.style.Theme_Dialog_RecentApplications);
-
-        final Resources resources = context.getResources();
     }
 
     /**
@@ -94,6 +92,8 @@ public class RecentApplicationsDialog extends Dialog implements OnClickListener 
     private void updateConfig() {
         final Context context = getContext();
         NUM_BUTTONS = Settings.System.getInt(context.getContentResolver(), Settings.System.RECENT_APPS_NUMBER, NUM_BUTTONS);
+        
+        final Resources resources = context.getResources();
         mIconSize = (int) resources.getDimension(android.R.dimen.app_icon_size); //TODO: Configurable, change based on number of recent apps?
         
         if (currRecentAppsNum == NUM_BUTTONS) //No change
