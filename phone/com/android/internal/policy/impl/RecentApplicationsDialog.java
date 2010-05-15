@@ -37,7 +37,6 @@ import android.view.View.OnClickListener;
 import android.widget.TextView;
 
 import java.util.List;
-import android.util.Log;
 
 public class RecentApplicationsDialog extends Dialog implements OnClickListener {
     // Elements for debugging support
