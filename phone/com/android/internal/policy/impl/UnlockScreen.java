@@ -25,6 +25,7 @@ import android.view.ViewGroup;
 import android.view.MotionEvent;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.FrameLayout;
 import android.text.format.DateFormat;
 import android.text.TextUtils;
 import android.util.Log;
@@ -32,8 +33,9 @@ import com.android.internal.R;
 import com.android.internal.telephony.IccCard;
 import com.android.internal.widget.LinearLayoutWithDefaultTouchRecepient;
 import com.android.internal.widget.LockPatternUtils;
-import com.android.internal.widget.LockPatternView;
-import com.android.internal.widget.LockPatternView.Cell;
+import com.android.internal.widget.LockPatternFactory;
+import com.android.internal.widget.LockPattern;
+import com.android.internal.widget.LockPattern.Cell;
 
 import java.util.List;
 import java.util.Date;
@@ -49,14 +51,7 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
     private static final boolean DEBUG = false;
     private static final String TAG = "UnlockScreen";
 
-    // how long before we clear the wrong pattern
-    private static final int PATTERN_CLEAR_TIMEOUT_MS = 2000;
-
-    // how long we stay awake once the user is ready to enter a pattern
     private static final int UNLOCK_PATTERN_WAKE_INTERVAL_MS = 7000;
-
-    // how many cells the user has to cross before we poke the wakelock
-    private static final int MIN_PATTERN_BEFORE_POKE_WAKELOCK = 2;
 
     private int mFailedPatternAttemptsSinceLastTimeout = 0;
     private int mTotalFailedPatternAttempts = 0;
@@ -95,7 +90,7 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
     private TextView mStatus2;
 
 
-    private LockPatternView mLockPatternView;
+    private LockPattern mLockPattern;
 
     private ViewGroup mFooterNormal;
     private ViewGroup mFooterForgotPattern;
@@ -108,15 +103,6 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
      */
     private long mLastPokeTime = -UNLOCK_PATTERN_WAKE_INTERVAL_MS;
 
-    /**
-     * Useful for clearing out the wrong pattern after a delay
-     */
-    private Runnable mCancelPatternRunnable = new Runnable() {
-        public void run() {
-            mLockPatternView.clearPattern();
-        }
-    };
-
     private Button mForgotPatternButton;
 
     enum FooterMode {
@@ -124,6 +110,20 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
         ForgotLockPattern,
         VerifyUnlocked
     }
+
+    private Runnable mPatternCorrectRunnable = new Runnable() {
+        public void run() {
+            mCallback.keyguardDone(true);
+        }
+    };
+
+    private Runnable mPatternWrongRunnable = new Runnable() {
+        public void run() {
+            mLockPattern.setState(LockPattern.State.Record);
+            mLockPattern.getView().setEnabled(true);
+            mLockPattern.enableInput();
+        }
+    };
 
     private void updateFooter(FooterMode mode) {
         switch (mode) {
@@ -188,8 +188,8 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
 
         resetStatusInfo();
 
-
-        mLockPatternView = (LockPatternView) findViewById(R.id.lockPattern);
+        mLockPattern = LockPatternFactory.inject(
+            (FrameLayout) findViewById(R.id.lockPattern));
 
         mFooterNormal = (ViewGroup) findViewById(R.id.footerNormal);
         mFooterForgotPattern = (ViewGroup) findViewById(R.id.footerForgotPattern);
@@ -218,17 +218,17 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
 
         // make it so unhandled touch events within the unlock screen go to the
         // lock pattern view.
-        setDefaultTouchRecepient(mLockPatternView);
+        setDefaultTouchRecepient(mLockPattern.getView());
 
-        mLockPatternView.setSaveEnabled(false);
-        mLockPatternView.setFocusable(false);
-        mLockPatternView.setOnPatternListener(new UnlockPatternListener());
+        mLockPattern.getView().setSaveEnabled(false);
+        mLockPattern.getView().setFocusable(false);
+        mLockPattern.setEventListener(new UnlockPatternListener());
 
         // stealth mode will be the same for the life of this screen
-        mLockPatternView.setInStealthMode(!mLockPatternUtils.isVisiblePatternEnabled());
+        mLockPattern.setInStealthMode(!mLockPatternUtils.isVisiblePatternEnabled());
 
         // vibrate mode will be the same for the life of this screen
-        mLockPatternView.setTactileFeedbackEnabled(mLockPatternUtils.isTactileFeedbackEnabled());
+        mLockPattern.setTactileFeedbackEnabled(mLockPatternUtils.isTactileFeedbackEnabled());
 
         // assume normal footer mode for now
         updateFooter(FooterMode.Normal);
@@ -245,9 +245,9 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
 
         // until we get an update...
         mCarrier.setText(
-                LockScreen.getCarrierString(
-                        mUpdateMonitor.getTelephonyPlmn(),
-                        mUpdateMonitor.getTelephonySpn()));
+            LockScreen.getCarrierString(
+                mUpdateMonitor.getTelephonyPlmn(),
+                mUpdateMonitor.getTelephonySpn()));
     }
 
     public void setEnableFallback(boolean state) {
@@ -383,9 +383,6 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
     public void onSimStateChanged(IccCard.State simState) {
     }
 
-
-
-
     /** {@inheritDoc} */
     public void onOrientationChange(boolean inPortrait) {
         if (inPortrait != mCreatedInPortrait) {
@@ -415,9 +412,9 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
         resetStatusInfo();
 
         // reset lock pattern
-        mLockPatternView.enableInput();
-        mLockPatternView.setEnabled(true);
-        mLockPatternView.clearPattern();
+        mLockPattern.enableInput();
+        mLockPattern.getView().setEnabled(true);
+        mLockPattern.clearPattern();
 
         // show "forgot pattern?" button if we have an alternate authentication method
         mForgotPatternButton.setVisibility(mCallback.doesFallbackUnlockScreenExist()
@@ -454,36 +451,33 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
         }
     }
 
-    private class UnlockPatternListener
-            implements LockPatternView.OnPatternListener {
+    private void pokeWakeLock() {
+        mCallback.pokeWakelock(UNLOCK_PATTERN_WAKE_INTERVAL_MS);
+    }
+
+    private class UnlockPatternListener implements LockPattern.EventListener {
 
         public void onPatternStart() {
-            mLockPatternView.removeCallbacks(mCancelPatternRunnable);
         }
 
         public void onPatternCleared() {
         }
 
-        public void onPatternCellAdded(List<Cell> pattern) {
-            // To guard against accidental poking of the wakelock, look for
-            // the user actually trying to draw a pattern of some minimal length.
-            if (pattern.size() > MIN_PATTERN_BEFORE_POKE_WAKELOCK) {
-                mCallback.pokeWakelock(UNLOCK_PATTERN_WAKE_INTERVAL_MS);
-            }
+        public void onUserInteraction() {
+            pokeWakeLock();
         }
 
-        public void onPatternDetected(List<LockPatternView.Cell> pattern) {
+        public void onPatternDetected(List<LockPattern.Cell> pattern) {
+            pokeWakeLock();
+
             if (mLockPatternUtils.checkPattern(pattern)) {
-                mLockPatternView
-                        .setDisplayMode(LockPatternView.DisplayMode.Correct);
-                mInstructions = "";
                 updateStatusLines();
-                mCallback.keyguardDone(true);
+                mLockPattern.setState(LockPattern.State.Correct);
+
+                mLockPattern.getView().postDelayed(
+                    mPatternCorrectRunnable,
+                    mLockPattern.getCorrectDelay());
             } else {
-                if (pattern.size() > MIN_PATTERN_BEFORE_POKE_WAKELOCK) {
-                    mCallback.pokeWakelock(UNLOCK_PATTERN_WAKE_INTERVAL_MS);
-                }
-                mLockPatternView.setDisplayMode(LockPatternView.DisplayMode.Wrong);
                 if (pattern.size() >= LockPatternUtils.MIN_PATTERN_REGISTER_FAIL) {
                     mTotalFailedPatternAttempts++;
                     mFailedPatternAttemptsSinceLastTimeout++;
@@ -497,16 +491,18 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
                 // TODO mUnlockIcon.setVisibility(View.VISIBLE);
                 mInstructions = getContext().getString(R.string.lockscreen_pattern_wrong);
                 updateStatusLines();
-                mLockPatternView.postDelayed(
-                        mCancelPatternRunnable,
-                        PATTERN_CLEAR_TIMEOUT_MS);
+                mLockPattern.setState(LockPattern.State.Incorrect);
+
+                mLockPattern.getView().postDelayed(
+                    mPatternWrongRunnable,
+                    mLockPattern.getIncorrectDelay());
             }
         }
     }
 
     private void handleAttemptLockout(long elapsedRealtimeDeadline) {
-        mLockPatternView.clearPattern();
-        mLockPatternView.setEnabled(false);
+        mLockPattern.clearPattern();
+        mLockPattern.getView().setEnabled(false);
         long elapsedRealtime = SystemClock.elapsedRealtime();
         mCountdownTimer = new CountDownTimer(elapsedRealtimeDeadline - elapsedRealtime, 1000) {
 
@@ -521,7 +517,7 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
 
             @Override
             public void onFinish() {
-                mLockPatternView.setEnabled(true);
+                mLockPattern.getView().setEnabled(true);
                 mInstructions = getContext().getString(R.string.lockscreen_pattern_instructions);
                 updateStatusLines();
                 // TODO mUnlockIcon.setVisibility(View.VISIBLE);

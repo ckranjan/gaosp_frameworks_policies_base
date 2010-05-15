@@ -210,6 +210,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     int mAccelerometerDefault = DEFAULT_ACCELEROMETER_ROTATION;
     boolean mHasSoftInput = false;
     
+    Long mTrackballHitTime;
+    boolean mVolumeUpPressed;
+    boolean mVolumeDownPressed;
+    static final long NEXT_DURATION = 400;
     // The current size of the screen.
     int mW, mH;
     // During layout, the current screen borders with all outer decoration
@@ -247,6 +251,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     static final int ENDCALL_SLEEPS = 0x2;
     static final int DEFAULT_ENDCALL_BEHAVIOR = ENDCALL_SLEEPS;
     int mEndcallBehavior;
+    boolean mTrackballWakeScreen;
     
     int mLandscapeRotation = -1;
     int mPortraitRotation = -1;
@@ -258,6 +263,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     PowerManager.WakeLock mBroadcastWakeLock;
     PowerManager.WakeLock mDockWakeLock;
 
+    int lastKeyCode = KeyEvent.getMaxKeyCode() + 1; //invalid code
+    int keyRepeatCount = 0;
+
     class SettingsObserver extends ContentObserver {
         SettingsObserver(Handler handler) {
             super(handler);
@@ -267,6 +275,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             ContentResolver resolver = mContext.getContentResolver();
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.END_BUTTON_BEHAVIOR), false, this);
+            resolver.registerContentObserver(Settings.System.getUriFor(
+                    Settings.System.TRACKBALL_WAKE_SCREEN), false, this);
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.ACCELEROMETER_ROTATION), false, this);
             resolver.registerContentObserver(Settings.Secure.getUriFor(
@@ -292,6 +302,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             synchronized (mLock) {
                 mEndcallBehavior = Settings.System.getInt(resolver,
                         Settings.System.END_BUTTON_BEHAVIOR, DEFAULT_ENDCALL_BEHAVIOR);
+                mTrackballWakeScreen = (Settings.System.getInt(mContext.getContentResolver(),
+                        Settings.System.TRACKBALL_WAKE_SCREEN, 0) == 1);
                 mFancyRotationAnimation = Settings.System.getInt(resolver,
                         "fancy_rotation_anim", 0) != 0 ? 0x80 : 0;
                 int accelerometerDefault = Settings.System.getInt(resolver,
@@ -471,6 +483,43 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             sendCloseSystemWindows(SYSTEM_DIALOG_REASON_RECENT_APPS);
             showRecentAppsDialog();
         }
+    };
+    /**
+     * When a volumeup-key longpress expires, skip songs based on key press
+     */
+    Runnable mVolumeUpLongPress = new Runnable() {
+        public void run() {
+            /*
+             * Eat the longpress so it won't dismiss the recent apps dialog when
+             * the user lets go of the volume key
+             */
+            mVolumeUpPressed = false;
+            // Shamelessly copied from MediaPlaybackService.java, which
+            // should be public, but isn't.
+            Intent i = new Intent("com.android.music.musicservicecommand");
+            i.putExtra("command", "next");
+            
+            mContext.sendBroadcast(i);
+        };
+    };
+    
+    /**
+     * When a volumedown-key longpress expires, skip songs based on key press
+     */
+    Runnable mVolumeDownLongPress = new Runnable() {
+        public void run() {
+            /*
+             * Eat the longpress so it won't dismiss the recent apps dialog when
+             * the user lets go of the volume key
+             */
+            mVolumeDownPressed = false;
+            // Shamelessly copied from MediaPlaybackService.java, which
+            // should be public, but isn't.
+            Intent i = new Intent("com.android.music.musicservicecommand");
+            i.putExtra("command", "previous");
+            
+            mContext.sendBroadcast(i);
+        };
     };
 
     /**
@@ -1606,13 +1655,46 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
     
+    void handleVolumeKeyDown(int keycode) {
+        // when keyguard is showing and screen off, we need
+        // to handle the volume key for calls and music here
+        if (isInCall()) {
+            handleVolumeKey(AudioManager.STREAM_VOICE_CALL, keycode);
+        } 
+        // Take an initial hit time so we can decide for skip or volume adjust
+        else if (isMusicActive()) {
+            if (keycode == KeyEvent.KEYCODE_VOLUME_UP) {
+                mVolumeUpPressed = true;
+                mHandler.postDelayed(mVolumeUpLongPress, ViewConfiguration.getLongPressTimeout());
+            }
+            else {
+                mVolumeDownPressed = true;
+                mHandler.postDelayed(mVolumeDownLongPress, ViewConfiguration.getLongPressTimeout());
+            }
+        }
+    }
+    
+    void handleVolumeKeyUp(int keycode) {
+        if (isMusicActive()) {
+            
+            if (keycode == KeyEvent.KEYCODE_VOLUME_UP)
+                mHandler.removeCallbacks(mVolumeUpLongPress);
+            else
+                mHandler.removeCallbacks(mVolumeDownLongPress);
+            
+            // Normal volume change - not consumed be long press already
+            if (mVolumeUpPressed || mVolumeDownPressed)
+                handleVolumeKey(AudioManager.STREAM_MUSIC, keycode);
+        }
+    }
+    
     static boolean isMediaKey(int code) {
         if (code == KeyEvent.KEYCODE_HEADSETHOOK || 
                 code == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE ||
                 code == KeyEvent.KEYCODE_MEDIA_STOP || 
                 code == KeyEvent.KEYCODE_MEDIA_NEXT ||
                 code == KeyEvent.KEYCODE_MEDIA_PREVIOUS || 
-                code == KeyEvent.KEYCODE_MEDIA_PREVIOUS ||
+                code == KeyEvent.KEYCODE_MEDIA_REWIND ||
                 code == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD) {
             return true;
         }
@@ -1633,7 +1715,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         if (false) {
             Log.d(TAG, "interceptKeyTq event=" + event + " keycode=" + event.keycode
-                  + " screenIsOn=" + screenIsOn + " keyguardActive=" + keyguardActive);
+                  + " screenIsOn=" + screenIsOn + " keyguardActive=" + keyguardActive + " isWakeKey=" + isWakeKey);
         }
 
         if (keyguardActive) {
@@ -1646,6 +1728,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
                 final boolean isKeyDown =
                         (event.type == RawInputEvent.EV_KEY) && (event.value != 0);
+                final boolean isKeyUp = 
+                        (event.type == RawInputEvent.EV_KEY) && (event.value == 0);
+                
+                // Detect if trackball pressed
+                boolean trackballDown = (event.type == RawInputEvent.EV_KEY && event.value != 0 
+                        && event.scancode == RawInputEvent.BTN_MOUSE);
+                
                 if (isWakeKey && isKeyDown) {
 
                     // tell the mediator about a wake key, it may decide to
@@ -1654,13 +1743,43 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     if (!mKeyguardMediator.onWakeKeyWhenKeyguardShowingTq(event.keycode)
                             && (event.keycode == KeyEvent.KEYCODE_VOLUME_DOWN
                                 || event.keycode == KeyEvent.KEYCODE_VOLUME_UP)) {
-                        // when keyguard is showing and screen off, we need
-                        // to handle the volume key for calls and  music here
-                        if (isInCall()) {
-                            handleVolumeKey(AudioManager.STREAM_VOICE_CALL, event.keycode);
-                        } else if (isMusicActive()) {
-                            handleVolumeKey(AudioManager.STREAM_MUSIC, event.keycode);
+                        handleVolumeKeyDown(event.keycode);
+                    }
+                }
+                else if (isWakeKey && isKeyUp) {
+                    if (!mKeyguardMediator.onWakeKeyWhenKeyguardShowingTq(event.keycode)
+                            && (event.keycode == KeyEvent.KEYCODE_VOLUME_DOWN
+                                    || event.keycode == KeyEvent.KEYCODE_VOLUME_UP)) {
+                        handleVolumeKeyUp(event.keycode);
+                    }
+                }
+                else if (trackballDown && isMusicActive()) {
+                    long time = SystemClock.elapsedRealtime();
+                    if (mTrackballHitTime == null)
+                        mTrackballHitTime = time;
+                    else {
+                        long timeBetweenHits;
+                        if (time > mTrackballHitTime)
+                            timeBetweenHits = time - mTrackballHitTime;
+                        // System clock rolled over
+                        else
+                            timeBetweenHits = time + (Long.MAX_VALUE - mTrackballHitTime);
+                        
+                        // Skip to the next song
+                        if (timeBetweenHits < NEXT_DURATION) {
+                            // Shamelessly copied from MediaPlaybackService.java, which
+                            // should be public, but isn't.
+                            Intent i = new Intent("com.android.music.musicservicecommand");
+                            i.putExtra("command", "next");
+                            i.putExtra("trackball", true);
+                            mContext.sendBroadcast(i);
+                            
+                            // Force another double-tap for next skip
+                            mTrackballHitTime = null;
                         }
+                        // Base double-tap off last hit.
+                        else
+                            mTrackballHitTime = time;
                     }
                 }
             }
@@ -1688,6 +1807,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         boolean down = event.value != 0;
 
         if (type == RawInputEvent.EV_KEY) {
+            if (down) {
+                if (code == lastKeyCode) {
+                    keyRepeatCount++;
+                } else {
+                    keyRepeatCount = 0;
+                }
+                lastKeyCode = code;
+            } else {
+                keyRepeatCount = 0;
+                lastKeyCode = KeyEvent.getMaxKeyCode() + 1; //invalid code
+            }
+
             if (code == KeyEvent.KEYCODE_ENDCALL
                     || code == KeyEvent.KEYCODE_POWER) {
                 if (down) {
@@ -1750,7 +1881,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     // only do it if the showing app doesn't process the key on its own.
                     KeyEvent keyEvent = new KeyEvent(event.when, event.when,
                             down ? KeyEvent.ACTION_DOWN : KeyEvent.ACTION_UP,
-                            code, 0);
+                            code, keyRepeatCount);
                     mBroadcastWakeLock.acquire();
                     mHandler.post(new PassHeadsetKey(keyEvent));
                 }
@@ -1890,8 +2021,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         // There are not key maps for trackball devices, but we'd still
         // like to have pressing it wake the device up, so force it here.
         int keycode = event.keycode;
+        int scancode = event.scancode;
         int flags = event.flags;
-        if (keycode == RawInputEvent.BTN_MOUSE) {
+        if (mTrackballWakeScreen && 
+                (keycode == RawInputEvent.BTN_MOUSE || scancode == RawInputEvent.BTN_MOUSE)) {
             flags |= WindowManagerPolicy.FLAG_WAKE;
         }
         return (flags
@@ -2162,16 +2295,21 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             // This code brings home to the front or, if it is already
             // at the front, puts the device to sleep.
             try {
-                ActivityManagerNative.getDefault().stopAppSwitches();
-                sendCloseSystemWindows();
-                Intent dock = createHomeDockIntent();
-                if (dock != null) {
-                    int result = ActivityManagerNative.getDefault()
-                            .startActivity(null, dock,
-                                    dock.resolveTypeIfNeeded(mContext.getContentResolver()),
-                                    null, 0, null, null, 0, true /* onlyIfNeeded*/, false);
-                    if (result == IActivityManager.START_RETURN_INTENT_TO_CALLER) {
-                        return false;
+                if (SystemProperties.getInt("persist.sys.uts-test-mode", 0) == 1) {
+                    /// Roll back EndcallBehavior as the cupcake design to pass P1 lab entry.
+                    Log.d(TAG, "UTS-TEST-MODE");
+                } else {
+                    ActivityManagerNative.getDefault().stopAppSwitches();
+                    sendCloseSystemWindows();
+                    Intent dock = createHomeDockIntent();
+                    if (dock != null) {
+                        int result = ActivityManagerNative.getDefault()
+                                .startActivity(null, dock,
+                                        dock.resolveTypeIfNeeded(mContext.getContentResolver()),
+                                        null, 0, null, null, 0, true /* onlyIfNeeded*/, false);
+                        if (result == IActivityManager.START_RETURN_INTENT_TO_CALLER) {
+                            return false;
+                        }
                     }
                 }
                 int result = ActivityManagerNative.getDefault()

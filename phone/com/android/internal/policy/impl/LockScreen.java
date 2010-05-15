@@ -20,6 +20,7 @@ import com.android.internal.R;
 import com.android.internal.telephony.IccCard;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.internal.widget.SlidingTab;
+import android.provider.Settings;
 
 import android.content.Context;
 import android.content.res.Resources;
@@ -85,7 +86,7 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
     private java.text.DateFormat mTimeFormat;
     private boolean mCreatedInPortrait;
     private boolean mEnableMenuKeyInLockScreen;
-
+    private boolean mTrackballUnlockScreen;
     /**
      * The status of this lock screen.
      */
@@ -169,6 +170,8 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
 
         mEnableMenuKeyInLockScreen = shouldEnableMenuKey();
 
+        mTrackballUnlockScreen = (Settings.System.getInt(mContext.getContentResolver(),
+                Settings.System.TRACKBALL_UNLOCK_SCREEN, 0) == 1);
         mCreatedInPortrait = updateMonitor.isInPortrait();
 
         final LayoutInflater inflater = LayoutInflater.from(context);
@@ -224,7 +227,8 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
     }
 
     private boolean isSilentMode() {
-        return mAudioManager.getRingerMode() == AudioManager.RINGER_MODE_SILENT;
+        int mode = mAudioManager.getRingerMode();
+        return  mode == AudioManager.RINGER_MODE_SILENT || mode == AudioManager.RINGER_MODE_VIBRATE;
     }
 
     private void updateRightTabResources() {
@@ -256,7 +260,7 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_MENU && mEnableMenuKeyInLockScreen) {
+        if ((keyCode == KeyEvent.KEYCODE_MENU && mEnableMenuKeyInLockScreen) || (keyCode == KeyEvent.KEYCODE_DPAD_CENTER && mTrackballUnlockScreen)) {
             mCallback.goToUnlockScreen();
         }
         return false;
@@ -269,9 +273,16 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
         } else if (whichHandle == SlidingTab.OnTriggerListener.RIGHT_HANDLE) {
             // toggle silent mode
             mSilentMode = !mSilentMode;
-            mAudioManager.setRingerMode(mSilentMode ? AudioManager.RINGER_MODE_SILENT
-                        : AudioManager.RINGER_MODE_NORMAL);
-
+            int ringerMode  = AudioManager.RINGER_MODE_NORMAL;
+            if (mSilentMode) {
+                int vibrateMode = mAudioManager.getVibrateSetting(AudioManager.VIBRATE_TYPE_RINGER);
+                if (vibrateMode == AudioManager.VIBRATE_SETTING_ON) {
+                    ringerMode = AudioManager.RINGER_MODE_VIBRATE;
+                } else {
+                    ringerMode = AudioManager.RINGER_MODE_SILENT;
+                }
+            }
+            mAudioManager.setRingerMode(ringerMode);
             updateRightTabResources();
 
             String message = mSilentMode ?
@@ -599,7 +610,7 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
 
     /** {@inheritDoc} */
     public void onRingerModeChanged(int state) {
-        boolean silent = AudioManager.RINGER_MODE_SILENT == state;
+        boolean silent = AudioManager.RINGER_MODE_SILENT == state || AudioManager.RINGER_MODE_VIBRATE == state;
         if (silent != mSilentMode) {
             mSilentMode = silent;
             updateRightTabResources();

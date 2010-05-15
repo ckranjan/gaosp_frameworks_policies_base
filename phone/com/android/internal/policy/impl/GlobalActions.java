@@ -25,6 +25,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.AudioManager;
+import android.provider.Settings;
 import android.os.Handler;
 import android.os.Message;
 import android.os.SystemProperties;
@@ -197,7 +198,7 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
                     }
                 };
 
-	// Drakaz : add reboot recovery in shutdown menu
+// Drakaz : add reboot recovery in shutdown menu
 	SinglePressAction mRebootRecoveryModeAction = new SinglePressAction(
                         com.android.internal.R.drawable.ic_menu_refresh,
                         R.string.global_action_reboot_recovery) {
@@ -220,10 +221,24 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
                 mSilentModeToggle,
                 // next: airplane mode
                 mAirplaneModeOn,
-                // Reboot
-                mRebootModeAction,
-		// Reboot Recovery
-		mRebootRecoveryModeAction,
+                // Reboot Recovery
+                mRebootRecoveryModeAction,
+                // next: reboot
+
+                new SinglePressAction(com.android.internal.R.drawable.ic_lock_power_off, R.string.global_action_reboot) {
+
+                    public void onPress() {
+                        ShutdownThread.reboot(mContext, true);
+                    }
+
+                    public boolean showDuringKeyguard() {
+                        return true;
+                    }
+
+                    public boolean showBeforeProvisioning() {
+                        return true;
+                    }
+                },
                 // last: power off
                 new SinglePressAction(
                         com.android.internal.R.drawable.ic_lock_power_off,
@@ -231,7 +246,7 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
 
                     public void onPress() {
                         // shutdown by making sure radio and power are handled accordingly.
-                        ShutdownThread.shutdown(mContext, true, false);
+                        ShutdownThread.shutdown(mContext, true);
                     }
 
                     public boolean showDuringKeyguard() {
