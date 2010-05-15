@@ -45,8 +45,8 @@ public class RecentApplicationsDialog extends Dialog implements OnClickListener 
 
     static private StatusBarManager sStatusBar;
 
-    private static int NUM_BUTTONS;
-    private static int MAX_RECENT_TASKS;    // allow for some discards
+    private static int NUM_BUTTONS = 6; // Default value
+    private static int MAX_RECENT_TASKS = NUM_BUTTONS * 2;    // allow for some discards
     
     //Wysie_Soh
     private static int currRecentAppsNum;
