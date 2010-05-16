@@ -245,6 +245,8 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
         
         // visible error path will be the same for the life of this screen
         mLockPattern.setShowErrorPath(mLockPatternUtils.isShowErrorPath());
+        
+        mLockPattern.setIncorrectDelay(mLockPatternUtils.getIncorrectDelay());
 
         // assume normal footer mode for now
         updateFooter(FooterMode.Normal);
