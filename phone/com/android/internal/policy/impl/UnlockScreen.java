@@ -292,8 +292,14 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
                 mStatus1.setCompoundDrawablesWithIntrinsicBounds(
                         R.drawable.ic_lock_idle_lock, 0, 0, 0);
             }
+            
+            if (mInstructions.equals(getContext().getString(R.string.lockscreen_pattern_wrong)) && !mLockPatternUtils.isShowUnlockErrMsg()) {
+                mStatus1.setVisibility(View.GONE);
+            }
+            else {
+                mStatus1.setVisibility(View.VISIBLE);
+            }
 
-            mStatus1.setVisibility(View.VISIBLE);
             mStatusSep.setVisibility(View.GONE);
             mStatus2.setVisibility(View.GONE);
         } else if (mShowingBatteryInfo && mNextAlarm == null) {
@@ -342,8 +348,14 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
             // nothing specific to show; show general instructions
             mStatus1.setText(R.string.lockscreen_pattern_instructions);
             mStatus1.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_lock_idle_lock, 0, 0, 0);
-
-            mStatus1.setVisibility(View.VISIBLE);
+                    
+            if (mLockPatternUtils.isShowUnlockMsg()) {
+                mStatus1.setVisibility(View.VISIBLE);
+            }
+            else {
+                mStatus1.setVisibility(View.GONE);
+            }
+                        
             mStatusSep.setVisibility(View.GONE);
             mStatus2.setVisibility(View.GONE);
         }
