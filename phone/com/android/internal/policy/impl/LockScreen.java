@@ -88,7 +88,8 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
     private boolean mCreatedInPortrait;
     private boolean mEnableMenuKeyInLockScreen;
     private boolean mTrackballUnlockScreen;
-// Double Carrier
+    
+    // Double Carrier
 	private static boolean mShowPlmnLs;
 	private static boolean mShowSpnLs;
     
@@ -178,11 +179,11 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
         mTrackballUnlockScreen = (Settings.System.getInt(mContext.getContentResolver(),
                 Settings.System.TRACKBALL_UNLOCK_SCREEN, 0) == 1);
 
-// Double Carrier
+        // Double Carrier
         mShowPlmnLs = (Settings.System.getInt(mContext.getContentResolver(),
-                Settings.System.SHOW_PLMN_LS, 0) == 1);
+                Settings.System.SHOW_PLMN_LS, 1) == 1);
         mShowSpnLs = (Settings.System.getInt(mContext.getContentResolver(),
-                Settings.System.SHOW_SPN_LS, 0) == 1);
+                Settings.System.SHOW_SPN_LS, 1) == 1);
         
         mCreatedInPortrait = updateMonitor.isInPortrait();
 
@@ -603,9 +604,14 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
                 break;
         }
     }
+    
+    static void setPlmnSpnUserPref(boolean showPlmn, boolean showSpn) {
+        mShowPlmnLs = showPlmn;
+        mShowSpnLs = showSpn;
+    }
 
     static CharSequence getCarrierString(CharSequence telephonyPlmn, CharSequence telephonySpn) {
-//Double carrier
+        //Double carrier
 		if (mShowSpnLs && mShowPlmnLs) { //If both are enabled, we follow the default android rules
 			if (telephonyPlmn != null && telephonySpn == null) {
 				return telephonyPlmn;

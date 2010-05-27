@@ -19,6 +19,7 @@ package com.android.internal.policy.impl;
 import android.content.Context;
 import android.os.CountDownTimer;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -260,6 +261,9 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
         // Required to get Marquee to work.
         mCarrier.setSelected(true);
         mCarrier.setTextColor(0xffffffff);
+        
+        LockScreen.setPlmnSpnUserPref((Settings.System.getInt(mContext.getContentResolver(), Settings.System.SHOW_PLMN_LS, 1) == 1),
+                            (Settings.System.getInt(mContext.getContentResolver(), Settings.System.SHOW_SPN_LS, 1) == 1));
 
         // until we get an update...
         mCarrier.setText(
