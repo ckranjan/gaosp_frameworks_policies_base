@@ -88,6 +88,9 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
     private boolean mCreatedInPortrait;
     private boolean mEnableMenuKeyInLockScreen;
     private boolean mTrackballUnlockScreen;
+// Double Carrier
+	private static boolean mShowPlmnLs;
+	private static boolean mShowSpnLs;
     
     /**
      * The status of this lock screen.
@@ -174,6 +177,12 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
 
         mTrackballUnlockScreen = (Settings.System.getInt(mContext.getContentResolver(),
                 Settings.System.TRACKBALL_UNLOCK_SCREEN, 0) == 1);
+
+// Double Carrier
+        mShowPlmnLs = (Settings.System.getInt(mContext.getContentResolver(),
+                Settings.System.SHOW_PLMN_LS, 0) == 1);
+        mShowSpnLs = (Settings.System.getInt(mContext.getContentResolver(),
+                Settings.System.SHOW_SPN_LS, 0) == 1);
         
         mCreatedInPortrait = updateMonitor.isInPortrait();
 
@@ -512,12 +521,12 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
     private void updateLayout(Status status) {
         switch (status) {
             case Normal:
-                // text
-                mCarrier.setText(
-                        getCarrierString(
-                                mUpdateMonitor.getTelephonyPlmn(),
-                                mUpdateMonitor.getTelephonySpn()));
-//                mScreenLocked.setText(R.string.lockscreen_screen_locked);
+                // text				
+		            mCarrier.setText(
+		                    getCarrierString(
+		                          mUpdateMonitor.getTelephonyPlmn(),
+		                          mUpdateMonitor.getTelephonySpn()));
+	//                mScreenLocked.setText(R.string.lockscreen_screen_locked);
 
                 // layout
                 mScreenLocked.setVisibility(View.VISIBLE);
@@ -596,16 +605,26 @@ class LockScreen extends LinearLayout implements KeyguardScreen, KeyguardUpdateM
     }
 
     static CharSequence getCarrierString(CharSequence telephonyPlmn, CharSequence telephonySpn) {
-        if (telephonyPlmn != null && telephonySpn == null) {
-            return telephonyPlmn;
-        } else if (telephonyPlmn != null && telephonySpn != null) {
-            return telephonyPlmn + "|" + telephonySpn;
-        } else if (telephonyPlmn == null && telephonySpn != null) {
-            return telephonySpn;
-        } else {
-            return "";
-        }
+//Double carrier
+		if (mShowSpnLs && mShowPlmnLs) { //If both are enabled, we follow the default android rules
+			if (telephonyPlmn != null && telephonySpn == null) {
+				return telephonyPlmn;
+			} else if (telephonyPlmn != null && telephonySpn != null) {
+				return telephonyPlmn + "|" + telephonySpn;
+			} else if (telephonyPlmn == null && telephonySpn != null) {
+				return telephonySpn;
+			}
+		}
+		else if (mShowSpnLs && !mShowPlmnLs && telephonySpn != null) { //If mShowSpnLs is enabled and mShowPlmnLs is disabled, we can ignore all plmn stuff
+			return telephonySpn;
+		}
+		else if (!mShowSpnLs && mShowPlmnLs && telephonyPlmn != null) { //If mShowSpnLs is disabled and mShowPlmnLs is enabled, we can ignore all spn stuff
+			return telephonyPlmn;
+		}
+
+		return ""; //If we reach here, means either both mShowSpnLs and mShowPlmnLs are disabled, or none of the conditions are met. Return empty string.
     }
+
 
     public void onSimStateChanged(IccCard.State simState) {
         if (DBG) Log.d(TAG, "onSimStateChanged(" + simState + ")");
