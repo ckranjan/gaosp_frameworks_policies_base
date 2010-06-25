@@ -19,6 +19,7 @@ package com.android.internal.policy.impl;
 import android.content.Context;
 import android.os.CountDownTimer;
 import android.os.SystemClock;
+import android.provider.Settings;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -88,6 +89,7 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
     private TextView mStatus1;
     private TextView mStatusSep;
     private TextView mStatus2;
+    private TextView mCustomMsg;
 
 
     private LockPattern mLockPattern;
@@ -185,6 +187,15 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
         mStatus1 = (TextView) findViewById(R.id.status1);
         mStatusSep = (TextView) findViewById(R.id.statusSep);
         mStatus2 = (TextView) findViewById(R.id.status2);
+        mCustomMsg = (TextView) findViewById(R.id.customMsg);
+        
+        if (mLockPatternUtils.isShowCustomMsg()) {
+            mCustomMsg.setVisibility(View.VISIBLE);
+            mCustomMsg.setText(mLockPatternUtils.getCustomMsg());
+        }
+        else {
+            mCustomMsg.setVisibility(View.GONE);
+        }
 
         resetStatusInfo();
 
@@ -229,6 +240,14 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
 
         // vibrate mode will be the same for the life of this screen
         mLockPattern.setTactileFeedbackEnabled(mLockPatternUtils.isTactileFeedbackEnabled());
+        
+        // visible dots mode will be the same for the life of this screen
+        mLockPattern.setVisibleDots(mLockPatternUtils.isVisibleDotsEnabled());
+        
+        // visible error path will be the same for the life of this screen
+        mLockPattern.setShowErrorPath(mLockPatternUtils.isShowErrorPath());
+        
+        mLockPattern.setIncorrectDelay(mLockPatternUtils.getIncorrectDelay());
 
         // assume normal footer mode for now
         updateFooter(FooterMode.Normal);
@@ -242,6 +261,9 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
         // Required to get Marquee to work.
         mCarrier.setSelected(true);
         mCarrier.setTextColor(0xffffffff);
+        
+        LockScreen.setPlmnSpnUserPref((Settings.System.getInt(mContext.getContentResolver(), Settings.System.SHOW_PLMN_LS, 1) == 1),
+                            (Settings.System.getInt(mContext.getContentResolver(), Settings.System.SHOW_SPN_LS, 1) == 1));
 
         // until we get an update...
         mCarrier.setText(
@@ -274,8 +296,14 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
                 mStatus1.setCompoundDrawablesWithIntrinsicBounds(
                         R.drawable.ic_lock_idle_lock, 0, 0, 0);
             }
+            
+            if (mInstructions.equals(getContext().getString(R.string.lockscreen_pattern_wrong)) && !mLockPatternUtils.isShowUnlockErrMsg()) {
+                mStatus1.setVisibility(View.GONE);
+            }
+            else {
+                mStatus1.setVisibility(View.VISIBLE);
+            }
 
-            mStatus1.setVisibility(View.VISIBLE);
             mStatusSep.setVisibility(View.GONE);
             mStatus2.setVisibility(View.GONE);
         } else if (mShowingBatteryInfo && mNextAlarm == null) {
@@ -324,8 +352,14 @@ class UnlockScreen extends LinearLayoutWithDefaultTouchRecepient
             // nothing specific to show; show general instructions
             mStatus1.setText(R.string.lockscreen_pattern_instructions);
             mStatus1.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_lock_idle_lock, 0, 0, 0);
-
-            mStatus1.setVisibility(View.VISIBLE);
+                    
+            if (mLockPatternUtils.isShowUnlockMsg()) {
+                mStatus1.setVisibility(View.VISIBLE);
+            }
+            else {
+                mStatus1.setVisibility(View.GONE);
+            }
+                        
             mStatusSep.setVisibility(View.GONE);
             mStatus2.setVisibility(View.GONE);
         }

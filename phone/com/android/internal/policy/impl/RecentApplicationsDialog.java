@@ -29,6 +29,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -44,10 +45,13 @@ public class RecentApplicationsDialog extends Dialog implements OnClickListener 
 
     static private StatusBarManager sStatusBar;
 
-    private static final int NUM_BUTTONS = 6;
-    private static final int MAX_RECENT_TASKS = NUM_BUTTONS * 2;    // allow for some discards
+    private static int NUM_BUTTONS = 6; // Default value
+    private static int MAX_RECENT_TASKS = NUM_BUTTONS * 2;    // allow for some discards
+    
+    //Wysie_Soh
+    private static int currRecentAppsNum;
 
-    final View[] mButtons = new View[NUM_BUTTONS];
+    View[] mButtons;
     View mNoAppsText;
     IntentFilter mBroadcastIntentFilter = new IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS);
 
@@ -56,9 +60,6 @@ public class RecentApplicationsDialog extends Dialog implements OnClickListener 
 
     public RecentApplicationsDialog(Context context) {
         super(context, com.android.internal.R.style.Theme_Dialog_RecentApplications);
-
-        final Resources resources = context.getResources();
-        mIconSize = (int) resources.getDimension(android.R.dimen.app_icon_size);
     }
 
     /**
@@ -85,7 +86,47 @@ public class RecentApplicationsDialog extends Dialog implements OnClickListener 
         theWindow.setFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM,
                 WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
         theWindow.setTitle("Recents");
-
+    }
+    
+    private void updateConfig() {
+        final Context context = getContext();
+        NUM_BUTTONS = Settings.System.getInt(context.getContentResolver(), Settings.System.RECENT_APPS_NUMBER, NUM_BUTTONS);
+        
+        final Resources resources = context.getResources();
+        mIconSize = (int) resources.getDimension(android.R.dimen.app_icon_size); //TODO: Configurable, change based on number of recent apps?
+        
+        if (currRecentAppsNum == NUM_BUTTONS) //No change
+            return;
+        
+        if (NUM_BUTTONS != 6 && NUM_BUTTONS != 9 && NUM_BUTTONS != 12 && NUM_BUTTONS != 15)
+            NUM_BUTTONS = 6; //Load 6 by default
+            
+        MAX_RECENT_TASKS = NUM_BUTTONS * 2;
+        currRecentAppsNum = NUM_BUTTONS;
+        
+        mButtons = new View[NUM_BUTTONS];
+        
+        if (NUM_BUTTONS == 15) {
+            loadFifteenRecentAppsConfig();
+        }
+        else if (NUM_BUTTONS == 12) {
+            loadTwelveRecentAppsConfig();
+        }
+        else if (NUM_BUTTONS == 9) {
+            loadNineRecentAppsConfig();
+        }
+        else { //Load 6 by default
+            loadSixRecentAppsConfig();
+        }            
+        
+        mNoAppsText = findViewById(com.android.internal.R.id.no_applications_message);
+        
+        for (View b : mButtons) {
+            b.setOnClickListener(this);
+        }        
+    }
+    
+    private void loadSixRecentAppsConfig() {
         setContentView(com.android.internal.R.layout.recent_apps_dialog);
 
         mButtons[0] = findViewById(com.android.internal.R.id.button1);
@@ -94,12 +135,59 @@ public class RecentApplicationsDialog extends Dialog implements OnClickListener 
         mButtons[3] = findViewById(com.android.internal.R.id.button4);
         mButtons[4] = findViewById(com.android.internal.R.id.button5);
         mButtons[5] = findViewById(com.android.internal.R.id.button6);
-        mNoAppsText = findViewById(com.android.internal.R.id.no_applications_message);
-
-        for (View b : mButtons) {
-            b.setOnClickListener(this);
-        }
     }
+    
+    private void loadNineRecentAppsConfig() {
+        setContentView(com.android.internal.R.layout.recent_apps_dialog_9);
+    
+        mButtons[0] = findViewById(com.android.internal.R.id.button1);
+        mButtons[1] = findViewById(com.android.internal.R.id.button2);
+        mButtons[2] = findViewById(com.android.internal.R.id.button3);
+        mButtons[3] = findViewById(com.android.internal.R.id.button4);
+        mButtons[4] = findViewById(com.android.internal.R.id.button5);
+        mButtons[5] = findViewById(com.android.internal.R.id.button6);
+        mButtons[6] = findViewById(com.android.internal.R.id.button7);
+        mButtons[7] = findViewById(com.android.internal.R.id.button8);
+        mButtons[8] = findViewById(com.android.internal.R.id.button9);
+    }
+    
+    private void loadTwelveRecentAppsConfig() {
+        setContentView(com.android.internal.R.layout.recent_apps_dialog_12);
+    
+        mButtons[0] = findViewById(com.android.internal.R.id.button1);
+        mButtons[1] = findViewById(com.android.internal.R.id.button2);
+        mButtons[2] = findViewById(com.android.internal.R.id.button3);
+        mButtons[3] = findViewById(com.android.internal.R.id.button4);
+        mButtons[4] = findViewById(com.android.internal.R.id.button5);
+        mButtons[5] = findViewById(com.android.internal.R.id.button6);
+        mButtons[6] = findViewById(com.android.internal.R.id.button7);
+        mButtons[7] = findViewById(com.android.internal.R.id.button8);
+        mButtons[8] = findViewById(com.android.internal.R.id.button9);
+        mButtons[9] = findViewById(com.android.internal.R.id.button10);
+        mButtons[10] = findViewById(com.android.internal.R.id.button11);
+        mButtons[11] = findViewById(com.android.internal.R.id.button12);
+    }
+    
+    private void loadFifteenRecentAppsConfig() {
+        setContentView(com.android.internal.R.layout.recent_apps_dialog_15);
+    
+        mButtons[0] = findViewById(com.android.internal.R.id.button1);
+        mButtons[1] = findViewById(com.android.internal.R.id.button2);
+        mButtons[2] = findViewById(com.android.internal.R.id.button3);
+        mButtons[3] = findViewById(com.android.internal.R.id.button4);
+        mButtons[4] = findViewById(com.android.internal.R.id.button5);
+        mButtons[5] = findViewById(com.android.internal.R.id.button6);
+        mButtons[6] = findViewById(com.android.internal.R.id.button7);
+        mButtons[7] = findViewById(com.android.internal.R.id.button8);
+        mButtons[8] = findViewById(com.android.internal.R.id.button9);
+        mButtons[9] = findViewById(com.android.internal.R.id.button10);
+        mButtons[10] = findViewById(com.android.internal.R.id.button11);
+        mButtons[11] = findViewById(com.android.internal.R.id.button12);
+        mButtons[12] = findViewById(com.android.internal.R.id.button13);
+        mButtons[13] = findViewById(com.android.internal.R.id.button14);
+        mButtons[14] = findViewById(com.android.internal.R.id.button15);
+    }   
+    
 
     /**
      * Handler for user clicks.  If a button was clicked, launch the corresponding activity.
@@ -123,6 +211,7 @@ public class RecentApplicationsDialog extends Dialog implements OnClickListener 
     @Override
     public void onStart() {
         super.onStart();
+        updateConfig();        
         reloadButtons();
         if (sStatusBar != null) {
             sStatusBar.disable(StatusBarManager.DISABLE_EXPAND);
