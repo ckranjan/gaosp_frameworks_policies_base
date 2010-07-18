@@ -2163,7 +2163,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         int scancode = event.scancode;
         int flags = event.flags;
         if (mTrackballWakeScreen && 
-                (keycode == RawInputEvent.BTN_MOUSE || scancode == RawInputEvent.BTN_MOUSE)) {
+                (keycode == android.view.KeyEvent.KEYCODE_HOLD || scancode == android.view.KeyEvent.KEYCODE_HOLD || keycode == RawInputEvent.BTN_MOUSE || scancode == RawInputEvent.BTN_MOUSE)) {
             flags |= WindowManagerPolicy.FLAG_WAKE;
         }
         return (flags
